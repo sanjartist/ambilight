@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ambilight Demo</title>
+<style>
+  body { font-family: Arial, sans-serif; text-align: center; background: #222; color: white; }
+  #container { position: relative; display: inline-block; margin-top: 20px; }
+  #ambilight-border { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; }
+  #media { max-width: 80vw; max-height: 80vh; display: block; }
+  #controls { margin-top: 20px; }
+</style>
+</head>
+<body>
+<h1>Ambilight Viewer</h1>
+<div id="controls">
+  <input type="text" id="urlInput" placeholder="Enter image/video URL" style="width:60%;"/>
+  <button id="loadUrl">Load URL</button>
+  <input type="file" id="fileInput" accept="image/*,video/*"/>
+</div>
+<div id="container">
+  <canvas id="ambilight-border"></canvas>
+  <img id="media" src="" alt="" style="display:none;"/>
+  <video id="video" controls style="display:none;"></video>
+</div>
+<script>
+const urlInput = document.getElementById('urlInput');
+const loadUrlBtn = document.getElementById('loadUrl');
+const fileInput = document.getElementById('fileInput');
+const img = document.getElementById('media');
+const video = document.getElementById('video');
+const canvas = document.getElementById('ambilight-border');
+const ctx = canvas.getContext('2d');
+
+function computeAmbilight(el) {
+  const thickness = 100; // ~2-3 cm on many displays
+  canvas.width = el.videoWidth || el.naturalWidth;
+  canvas.height = el.videoHeight || el.naturalHeight;
+  ctx.drawImage(el, 0, 0, canvas.width, canvas.height);
+  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+  let r=0,g=0,b=0,count=0;
+  const w = canvas.width, h = canvas.height;
+  for(let y=0;y<h;y++){
+    for(let x=0;x<w;x++){
+      if(x<thickness || x>=w-thickness || y<thickness || y>=h-thickness){
+        const index = (y*w + x)*4;
+        r += imgData[index];
+        g += imgData[index+1];
+        b += imgData[index+2];
+        count++;
+      }
+    }
+  }
+  r = Math.round(r/count);
+  g = Math.round(g/count);
+  b = Math.round(b/count);
+  canvas.style.boxShadow = `0 0 50px rgb(${r},${g},${b})`;
+}
+
+function handleImage(el){
+  img.style.display='block';
+  video.style.display='none';
+  img.onload = () => computeAmbilight(img);
+  img.src = el.src;
+}
+
+function handleVideo(el){
+  img.style.display='none';
+  video.style.display='block';
+  video.onloadeddata = () => computeAmbilight(video);
+  video.src = el.src;
+  video.play();
+}
+
+loadUrlBtn.addEventListener('click', () => {
+  const url = urlInput.value.trim();
+  if(!url) return;
+  if(url.match(/\.(mp4|webm|ogg)$/i)){
+    handleVideo({src:url});
+  } else {
+    handleImage({src:url});
+  }
+});
+
+fileInput.addEventListener('change', () => {
+  const file = fileInput.files[0];
+  if(!file) return;
+  const url = URL.createObjectURL(file);
+  if(file.type.startsWith('video')){
+    handleVideo({src:url});
+  } else {
+    handleImage({src:url});
+  }
+});
+</script>
+</body>
+</html>
